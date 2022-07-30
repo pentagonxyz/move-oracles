@@ -3,6 +3,34 @@ module oracles::oracle_factory{
     use sui::object::{Self, ID, Info};
     use sui::tx_context::{Self, TxContext};
 
+
+    ///*///////////////////////////////////////////////////////////////
+    //                      MAIN FUNCTIONALITY OBJECTS               //
+    /////////////////////////////////////////////////////////////////*/
+
+    // This object represents an oracle. A new `Oracle` object is created when a new oracle is initialized.
+    // It holds data about the oracle and its current state.
+    struct Oracle has key, store {
+        info: Info,
+
+        // Timestamp of the last update.
+        last_update: u64,
+
+        // Interval before the data is updated.
+        interval: u64,
+
+        // Minimum posts required to update the data.
+        min_posts: u8,
+
+        // Current data.
+        data: Data,
+    }
+
+    struct Data has store {
+        // Price Data stored by the oracle.
+        price: u64,
+    }
+
     ///*///////////////////////////////////////////////////////////////
     //                          CAPABILITIES                         //
     /////////////////////////////////////////////////////////////////*/
