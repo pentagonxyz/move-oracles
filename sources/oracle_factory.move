@@ -149,8 +149,9 @@ module oracles::price_oracle_factory{
         transfer::transfer(validator_cap, validator);
     }
 
+
     ///*///////////////////////////////////////////////////////////////
-    //                  WRITE DATA/UPDATE FUNCTIONALITY              //
+    //                    PRICE UPDATE FUNCTIONALITY                 //
     /////////////////////////////////////////////////////////////////*/
 
     // Force the oracle to update its data (can only be called by the owner of the oracle).
@@ -208,6 +209,18 @@ module oracles::price_oracle_factory{
         self.last_update = timestamp;
 
         average
+    }
+    
+    ///*///////////////////////////////////////////////////////////////
+    //                     READ DATA FUNCTIONALITY                   //
+    /////////////////////////////////////////////////////////////////*/
+
+    // This function can be called by anyone to read an oracle's data.
+    public fun read_data(
+        // The ID of the oracle object.
+        self: &Oracle,
+    ): u64 {
+        self.data.price
     }
 
     ///*///////////////////////////////////////////////////////////////
