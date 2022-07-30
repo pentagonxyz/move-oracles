@@ -148,4 +148,10 @@ module oracles::price_oracle_factory{
         // Ensure the caller is the owner of the Oracle object.
         assert!(object::id(self) == &admin_cap.oracle_id, EOwnerOnly);
     }
+
+    // Ensure that an OracleOwnerCap object matches the oracle object.
+    fun check_validator(self: &mut Oracle, validator_cap: &OracleValidatorCap) {
+        // Ensure the caller is the owner of the Oracle object.
+        assert!(object::id(self) == &validator_cap.oracle_id, EOwnerOnly);
+    }
 }
