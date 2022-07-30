@@ -1,5 +1,7 @@
 // Oracle Factory contract that is used to create and interact with new oracles.
 module oracles::price_oracle_factory{
+    use std::vector;
+
     use sui::object::{Self, ID, Info};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer::{Self};
@@ -21,13 +23,17 @@ module oracles::price_oracle_factory{
         interval: u64,
 
         // Minimum posts required to update the data.
-        min_posts: u8,
+        min_posts: u64,
 
-        // Current data.
+        // Vector containing written data. 
+        new_data: vector<Data>,
+
+        // Most recent data (average of all written information since the last update).
         data: Data,
+
     }
 
-    struct Data has store {
+    struct Data has store, drop {
         // Price Data stored by the oracle.
         price: u64,
     }
@@ -60,6 +66,9 @@ module oracles::price_oracle_factory{
     // Attempt to perform an operation only allowed by the owner.
     const EOwnerOnly: u64 = 0;
 
+    // Attempt to perform an operation only allowed by the owner.
+    const EValidatorOnly: u64 = 1;
+
     ///*///////////////////////////////////////////////////////////////
     //                     ORACLE CREATION LOGIC                     //
     /////////////////////////////////////////////////////////////////*/
@@ -69,7 +78,7 @@ module oracles::price_oracle_factory{
         // The interval before the data is updated.
         interval: u64,
         // The minimum posts required to update the data.
-        min_posts: u8,
+        min_posts: u64,
         // Transaction Context.
         ctx: &mut TxContext,
     ): OracleOwnerCap {
@@ -83,6 +92,7 @@ module oracles::price_oracle_factory{
             last_update: 0,
             interval: interval,
             min_posts: min_posts,
+            new_data: vector<Data>[],
             data: Data {
                 price: 0,
             },
@@ -100,7 +110,7 @@ module oracles::price_oracle_factory{
         // The interval before the data is updated.
         interval: u64,
         // The minimum posts required to update the data.
-        min_posts: u8,
+        min_posts: u64,
         // Transaction Context.
         ctx: &mut TxContext
     ) {
@@ -118,7 +128,7 @@ module oracles::price_oracle_factory{
     // This function is called by the oracle owner to list a validator.
     public fun list_validator(
         // The ID of the oracle object.
-        oracle: &mut Oracle,
+        self: &mut Oracle,
         // The ID of the validator to list.
         validator: address,
         // A reference to the OracleOwnerCap object. Serves as proof of ownership.
@@ -127,16 +137,77 @@ module oracles::price_oracle_factory{
         ctx: &mut TxContext,
     ) {
         // Check if the caller is the owner of the right oracle.
-        check_owner(oracle, oracle_owner_cap);
+        check_owner(self, oracle_owner_cap);
 
         // Create a new OracleValidatorCap object.
         let validator_cap = OracleValidatorCap {
             info: object::new(ctx),
-            oracle_id: *object::info_id(&oracle.info),
+            oracle_id: *object::info_id(&self.info),
         };
 
         // Transfer the validator capability to the validator.
         transfer::transfer(validator_cap, validator);
+    }
+
+    ///*///////////////////////////////////////////////////////////////
+    //                  WRITE DATA/UPDATE FUNCTIONALITY              //
+    /////////////////////////////////////////////////////////////////*/
+
+    // Force the oracle to update its data (can only be called by the owner of the oracle).
+    // This function is called by the oracle owner to list a validator.
+    public fun force_update(
+        // The ID of the oracle object.
+        self: &mut Oracle,
+        // A reference to the OracleOwnerCap object. Serves as proof of ownership.
+        oracle_owner_cap: &OracleOwnerCap,
+        // Timestamp
+        timestamp: u64,
+    ): u64 {
+        // Check if the caller is the owner of the right oracle.
+        check_owner(self, oracle_owner_cap);
+
+        // Update the data.
+        update_data(self, timestamp)
+    }
+
+    // Ensure that an OracleOwnerCap object matches the oracle object.
+    public entry fun write_data(self: &mut Oracle, validator_cap: &mut OracleValidatorCap, timestamp: u64, data: Data) {
+        // Ensure the caller is a verified validator of the Oracle object.
+        check_validator(self, validator_cap);
+
+        //  Push the data to the Oracle object's `new_data` vector.
+        vector::push_back(&mut self.new_data, data);
+
+        // If the oracle has enough posts or has not been updated within its interval, update the data.
+        if(vector::length(&self.new_data) >= self.min_posts || timestamp - self.last_update > self.interval) {
+            // Update the data.
+            update_data(self, timestamp);
+        }
+    }
+
+    // Update the oracle's data by calculating the averages of the supplied information. Return the new price.
+    fun update_data(self: &mut Oracle, timestamp: u64): u64 {
+        // Calculate the average of all data in the `new_data` vector.
+        let total = 0;
+        let data_vector = &mut self.new_data;
+        let size = vector::length(data_vector);
+        
+        let i = 0;
+        while(size>i) {
+            let data = vector::borrow(data_vector, i);
+            total = total + data.price;
+            i = i + 1;
+        };
+
+        // Calculate the average price.
+        let average = total / size;
+
+        // Update the new price, clear the `new_data` vector, and update the `last_update` timestamp.
+        self.data.price = *&average;
+        self.new_data = vector<Data>[];
+        self.last_update = timestamp;
+
+        average
     }
 
     ///*///////////////////////////////////////////////////////////////
@@ -149,9 +220,9 @@ module oracles::price_oracle_factory{
         assert!(object::id(self) == &admin_cap.oracle_id, EOwnerOnly);
     }
 
-    // Ensure that an OracleOwnerCap object matches the oracle object.
+    // Ensure that an OracleValidatorCap object matches the oracle object.
     fun check_validator(self: &mut Oracle, validator_cap: &OracleValidatorCap) {
-        // Ensure the caller is the owner of the Oracle object.
-        assert!(object::id(self) == &validator_cap.oracle_id, EOwnerOnly);
+        // Ensure the caller is a verified validator of the Oracle object.
+        assert!(object::id(self) == &validator_cap.oracle_id, EValidatorOnly);
     }
 }
