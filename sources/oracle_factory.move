@@ -54,6 +54,13 @@ module oracles::price_oracle_factory{
     }
 
     ///*///////////////////////////////////////////////////////////////
+    //                           ERROR CODES                         //
+    /////////////////////////////////////////////////////////////////*/
+
+    // Attempt to perform an operation only allowed by the owner.
+    const EOwnerOnly: u64 = 0;
+
+    ///*///////////////////////////////////////////////////////////////
     //                     ORACLE CREATION LOGIC                     //
     /////////////////////////////////////////////////////////////////*/
 
@@ -102,5 +109,43 @@ module oracles::price_oracle_factory{
 
         // Transfer to Owner Capability to the original caller.
         transfer::transfer(oracle_owner_cap, tx_context::sender(ctx));
-    } 
+    }
+
+    ///*///////////////////////////////////////////////////////////////
+    //                   VALIDATOR LIST FUNCTIONALITY                //
+    /////////////////////////////////////////////////////////////////*/
+
+    // This function is called by the oracle owner to list a validator.
+    public fun list_validator(
+        // The ID of the oracle object.
+        oracle: &mut Oracle,
+        // The ID of the validator to list.
+        validator: address,
+        // A reference to the OracleOwnerCap object. Serves as proof of ownership.
+        oracle_owner_cap: &OracleOwnerCap,
+        // Transaction Context.
+        ctx: &mut TxContext,
+    ) {
+        // Check if the caller is the owner of the right oracle.
+        check_owner(oracle, oracle_owner_cap);
+
+        // Create a new OracleValidatorCap object.
+        let validator_cap = OracleValidatorCap {
+            info: object::new(ctx),
+            oracle_id: *object::info_id(&oracle.info),
+        };
+
+        // Transfer the validator capability to the validator.
+        transfer::transfer(validator_cap, validator);
+    }
+
+    ///*///////////////////////////////////////////////////////////////
+    //                  INTERNAL UTILITY FUNCTIONS                   //
+    /////////////////////////////////////////////////////////////////*/
+
+    // Ensure that an OracleOwnerCap object matches the oracle object.
+    fun check_owner(self: &mut Oracle, admin_cap: &OracleOwnerCap) {
+        // Ensure the caller is the owner of the Oracle object.
+        assert!(object::id(self) == &admin_cap.oracle_id, EOwnerOnly);
+    }
 }
