@@ -1,5 +1,5 @@
 // Oracle Factory contract that is used to create and interact with new oracles.
-module oracles::oracle_factory{
+module oracles::price_oracle_factory{
     use sui::object::{Self, ID, Info};
     use sui::tx_context::{Self, TxContext};
 
