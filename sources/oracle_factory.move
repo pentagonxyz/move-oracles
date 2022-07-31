@@ -1,4 +1,4 @@
-// A module that allows you to create and interact with oracle objects.
+// Create and share price oracles.
 module oracles::price_oracle_factory{
     use std::vector;
 
@@ -18,22 +18,22 @@ module oracles::price_oracle_factory{
         // Timestamp of the last update.
         last_update: u64,
 
-        // Interval before the data is updated.
+        // Time between updates.
         interval: u64,
 
-        // Minimum posts required to update the data.
+        // Minimum posts required to update the price.
         min_posts: u64,
 
-        // Vector containing written data. 
+        // Vector containing posted data.
         new_data: vector<Data>,
 
-        // Most recent data (average of all written information since the last update).
+        // Most recent updated price (average of all written information since the last update).
         data: Data,
 
     }
     
-    // This object represents data that is written to the oracle.
-    // Made in order to make it easy to swap out when writing a different implementation.
+    // Represents data held by the oracle.
+    // Implemented to make it easier to fork the module to return more than just prices.
     struct Data has store, drop {
         // Price Data stored by the oracle.
         price: u64,
@@ -43,8 +43,8 @@ module oracles::price_oracle_factory{
     //                          CAPABILITIES                         //
     /////////////////////////////////////////////////////////////////*/
 
-    // This object is created when a new oracle is generated.
-    // It enables the holder to list/unlist validators and deprecate the oracle.
+    // Created when a new oracle is generated.
+    // Represents ownership, enabling the holder to list/unlist validators.
     struct OwnerCap has key, store {
         info: Info,
 
@@ -52,8 +52,7 @@ module oracles::price_oracle_factory{
         oracle_id: ID,
     }
 
-    // This object is created when a validator is listed by the oracle owner.
-    // It grants the ability to write data to the oracle.
+    // Created when a validator is listed by the oracle owner, grants the ability to write data to the oracle.
     struct ValidatorCap has key, store {
         info: Info,
 
@@ -105,7 +104,7 @@ module oracles::price_oracle_factory{
         }
     }
 
-    // Create a new oracle and send the validator capability to the sender of the tx origin.
+    // Create a new oracle and send the owner capability to the sender of the tx origin.
     public entry fun create_oracle(        
         interval: u64,
         min_posts: u64,
@@ -119,21 +118,17 @@ module oracles::price_oracle_factory{
     }
 
     ///*///////////////////////////////////////////////////////////////
-    //                   VALIDATOR LIST FUNCTIONALITY                //
+    //                   VALIDATOR LISTING FUNCTIONS                 //
     /////////////////////////////////////////////////////////////////*/
 
     // List a new validator (can only be called by the owner).
     public fun list_validator(
-        // The ID of the oracle object.
         self: &mut Oracle,
-        // The address of the validator to list.
         validator: address,
-        // A reference to the OwnerCap object. Serves as proof of ownership.
         oracle_owner_cap: &OwnerCap,
-        // Transaction Context.
         ctx: &mut TxContext,
     ) {
-        // Check if the caller is the owner of the right oracle.
+        // Check if the caller is the owner of the referenced oracle.
         check_owner(self, oracle_owner_cap);
 
         // Create a new ValidatorCap object.
@@ -148,19 +143,16 @@ module oracles::price_oracle_factory{
 
 
     ///*///////////////////////////////////////////////////////////////
-    //                    PRICE UPDATE FUNCTIONALITY                 //
+    //                    PRICE POSTS + UPDATE LOGIC                 //
     /////////////////////////////////////////////////////////////////*/
 
     // Force the oracle to update its pricing data (can only be called by the owner of the oracle).
     public fun force_update(
-        // The ID of the oracle object.
         self: &mut Oracle,
-        // A reference to the OwnerCap object. Serves as proof of ownership.
         oracle_owner_cap: &OwnerCap,
-        // Timestamp
         timestamp: u64,
     ): u64 {
-        // Check if the caller is the owner of the right oracle.
+        // Check if the caller is the owner of the referenced oracle.
         check_owner(self, oracle_owner_cap);
 
         // Update the pricing data.
@@ -208,7 +200,7 @@ module oracles::price_oracle_factory{
     }
 
     ///*///////////////////////////////////////////////////////////////
-    //                     READ DATA FUNCTIONALITY                   //
+    //                           VIEW METHODS                        //
     /////////////////////////////////////////////////////////////////*/
 
     // This function can be called by anyone to read an oracle's data.
